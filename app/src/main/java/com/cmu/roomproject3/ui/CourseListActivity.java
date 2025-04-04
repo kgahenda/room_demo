@@ -16,7 +16,6 @@ import com.cmu.roomproject3.R;
 import com.cmu.roomproject3.viewmodel.CourseViewModel;
 
 public class CourseListActivity extends AppCompatActivity {
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -25,7 +24,7 @@ public class CourseListActivity extends AppCompatActivity {
         RecyclerView recyclerView = findViewById(R.id.course_recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         CourseAdapter adapter = new CourseAdapter(course -> {
-            Intent intent = new Intent(this, QuizListActivity.class);
+            Intent intent = new Intent(this, CourseStatsActivity.class);
             intent.putExtra("COURSE_ID", course.getCourseId());
             intent.putExtra("COURSE_TITLE", course.getName());
             startActivity(intent);

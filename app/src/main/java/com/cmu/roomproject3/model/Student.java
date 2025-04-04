@@ -4,9 +4,8 @@ import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
 @Entity
-public class Student
-{
-    @PrimaryKey(autoGenerate = true)
+public class Student {
+    @PrimaryKey
     private Long studentId;
     private String name;
 

@@ -1,6 +1,7 @@
 package com.cmu.roomproject3.database;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.room.Database;
 import androidx.room.Room;
@@ -16,10 +17,10 @@ import com.cmu.roomproject3.model.Quiz;
 import com.cmu.roomproject3.model.Student;
 import com.cmu.roomproject3.model.StudentQuizCrossRef;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 @Database(
         entities = {
@@ -31,18 +32,15 @@ import java.util.stream.Collectors;
         },
         version = 1
 )
-public abstract class AppDatabase extends RoomDatabase
-{
+public abstract class AppDatabase extends RoomDatabase {
     public abstract CourseDao courseDao();
     public abstract StudentDao studentDao();
     public abstract QuizDao quizDao();
 
     private static volatile AppDatabase INSTANCE;
 
-    // Executor service for database write operations
     public static final ExecutorService databaseWriteExecutor = Executors.newFixedThreadPool(4);
 
-    // Method to get the database instance
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -53,13 +51,13 @@ public abstract class AppDatabase extends RoomDatabase
                                 @Override
                                 public void onCreate(SupportSQLiteDatabase db) {
                                     super.onCreate(db);
-                                    // Seed the database on creation
                                     databaseWriteExecutor.execute(() -> {
                                         AppDatabase database = getDatabase(context);
                                         seedDatabase(database);
                                     });
                                 }
                             })
+                            .fallbackToDestructiveMigration()
                             .build();
                 }
             }
@@ -68,85 +66,161 @@ public abstract class AppDatabase extends RoomDatabase
     }
 
     private static void seedDatabase(AppDatabase database) {
-        CourseDao courseDao = database.courseDao();
-        QuizDao quizDao = database.quizDao();
-        StudentDao studentDao = database.studentDao();
+        try {
+            CourseDao courseDao = database.courseDao();
+            QuizDao quizDao = database.quizDao();
+            StudentDao studentDao = database.studentDao();
 
-        // Insert 3 courses
-        Course course1 = new Course();
-        course1.setName("Programming 101");
-        course1.setDescription("Intro to Programming");
-        Long course1Id = courseDao.insert(course1);
+            // Insert 3 courses
+            Course course1 = new Course();
+            course1.setName("Programming 101");
+            course1.setDescription("Intro to Programming");
+            Long course1Id = courseDao.insert(course1);
 
-        Course course2 = new Course();
-        course2.setName("Data Structures");
-        course2.setDescription("Advanced Data Structures");
-        Long course2Id = courseDao.insert(course2);
+            Course course2 = new Course();
+            course2.setName("Data Structures");
+            course2.setDescription("Advanced Data Structures");
+            Long course2Id = courseDao.insert(course2);
 
-        Course course3 = new Course();
-        course3.setName("Algorithms");
-        course3.setDescription("Algorithm Design");
-        Long course3Id = courseDao.insert(course3);
+            Course course3 = new Course();
+            course3.setName("DPSD");
+            course3.setDescription("Design Patterns for SmartPhone Development");
+            Long course3Id = courseDao.insert(course3);
 
-        // Insert 5 quizzes for each course
-        for (int i = 1; i <= 5; i++) {
-            Quiz quiz1 = new Quiz();
-            quiz1.setCourseId(course1Id);
-            quiz1.setName("Quiz " + i);
-            quiz1.setHighScore(0);
-            quiz1.setLowScore(0);
-            quiz1.setAverageScore(0.0);
-            Long quiz1Id = quizDao.insert(quiz1);
+            // Insert 5 quizzes for each course and store quiz IDs
+            List<Long> quizIdsCourse1 = new ArrayList<>();
+            List<Long> quizIdsCourse2 = new ArrayList<>();
+            List<Long> quizIdsCourse3 = new ArrayList<>();
+            for (int i = 1; i <= 5; i++) {
+                Quiz quiz1 = new Quiz();
+                quiz1.setCourseId(course1Id);
+                quiz1.setName("Quiz " + i);
+                Long quiz1Id = quizDao.insert(quiz1);
+                quizIdsCourse1.add(quiz1Id);
 
-            Quiz quiz2 = new Quiz();
-            quiz2.setCourseId(course2Id);
-            quiz2.setName("Quiz " + i);
-            quiz2.setHighScore(0);
-            quiz2.setLowScore(0);
-            quiz2.setAverageScore(0.0);
-            Long quiz2Id = quizDao.insert(quiz2);
+                Quiz quiz2 = new Quiz();
+                quiz2.setCourseId(course2Id);
+                quiz2.setName("Quiz " + i);
+                Long quiz2Id = quizDao.insert(quiz2);
+                quizIdsCourse2.add(quiz2Id);
 
-            Quiz quiz3 = new Quiz();
-            quiz3.setCourseId(course3Id);
-            quiz3.setName("Quiz " + i);
-            quiz3.setHighScore(0);
-            quiz3.setLowScore(0);
-            quiz3.setAverageScore(0.0);
-            Long quiz3Id = quizDao.insert(quiz3);
-        }
-
-        // Insert 10 students
-        for (int i = 1; i <= 10; i++) {
-            Student student = new Student();
-            student.setName("Student " + String.format("%04d", i));
-            Long studentId = studentDao.insert(student);
-
-            // Enroll in all courses
-            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course1Id, studentId));
-            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course2Id, studentId));
-            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course3Id, studentId));
-        }
-
-        // Insert scores and update stats
-        for (long courseId = 1; courseId <= 3; courseId++) {
-            for (int quizNum = 1; quizNum <= 5; quizNum++) {
-                Long quizId = (courseId - 1) * 5 + quizNum;
-                for (long studentId = 1; studentId <= 10; studentId++) {
-                    StudentQuizCrossRef score = new StudentQuizCrossRef();
-                    score.studentId = studentId;
-                    score.quizId = quizId;
-                    score.score = 60 + (Math.random() * 40);
-                    quizDao.insertStudentQuizCrossRef(score);
-                }
-
-                // Update quiz stats synchronously
-                List<StudentQuizCrossRef> scores = quizDao.getScoresForQuiz(quizId);
-                Quiz quiz = quizDao.getQuizWithStudents(quizId).getValue().quiz;
-                quiz.setHighScore((int) scores.stream().mapToDouble(s -> s.score).max().orElse(0));
-                quiz.setLowScore((int) scores.stream().mapToDouble(s -> s.score).min().orElse(0));
-                quiz.setAverageScore(scores.stream().mapToDouble(s -> s.score).average().orElse(0.0));
-                quizDao.update(quiz);
+                Quiz quiz3 = new Quiz();
+                quiz3.setCourseId(course3Id);
+                quiz3.setName("Quiz " + i);
+                Long quiz3Id = quizDao.insert(quiz3);
+                quizIdsCourse3.add(quiz3Id);
             }
+
+            // Insert students with 4-digit IDs
+            Student student1 = new Student();
+            student1.setStudentId(1234L);
+            student1.setName("Student 1234");
+            Long student1Id = studentDao.insert(student1);
+
+            Student student2 = new Student();
+            student2.setStudentId(2134L);
+            student2.setName("Student 2134");
+            Long student2Id = studentDao.insert(student2);
+
+            Student student3 = new Student();
+            student3.setStudentId(1852L);
+            student3.setName("Student 1852");
+            Long student3Id = studentDao.insert(student3);
+
+            // Enroll students in all courses
+            // Programming 101
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course1Id, student1Id));
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course1Id, student2Id));
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course1Id, student3Id));
+
+            // Data Structures
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course2Id, student1Id));
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course2Id, student2Id));
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course2Id, student3Id));
+
+            // DPSD
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course3Id, student1Id));
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course3Id, student2Id));
+            studentDao.insertCourseStudentCrossRef(new CourseStudentCrossRef(course3Id, student3Id));
+
+            // Insert scores for Programming 101 using correct quiz IDs
+            // Student 1234
+            double[] scores1 = {78, 83, 87, 91, 86};
+            for (int i = 0; i < 5; i++) {
+                StudentQuizCrossRef score = new StudentQuizCrossRef();
+                score.studentId = student1Id;
+                score.quizId = quizIdsCourse1.get(i);
+                score.score = scores1[i];
+                quizDao.insertStudentQuizCrossRef(score);
+            }
+            // Student 2134
+            double[] scores2 = {67, 77, 84, 82, 79};
+            for (int i = 0; i < 5; i++) {
+                StudentQuizCrossRef score = new StudentQuizCrossRef();
+                score.studentId = student2Id;
+                score.quizId = quizIdsCourse1.get(i);
+                score.score = scores2[i];
+                quizDao.insertStudentQuizCrossRef(score);
+            }
+            // Student 1852
+            double[] scores3 = {77, 89, 93, 87, 71};
+            for (int i = 0; i < 5; i++) {
+                StudentQuizCrossRef score = new StudentQuizCrossRef();
+                score.studentId = student3Id;
+                score.quizId = quizIdsCourse1.get(i);
+                score.score = scores3[i];
+                quizDao.insertStudentQuizCrossRef(score);
+            }
+
+            // Insert random scores for Data Structures
+            for (int i = 0; i < 5; i++) {
+                // Student 1234
+                StudentQuizCrossRef score1 = new StudentQuizCrossRef();
+                score1.studentId = student1Id;
+                score1.quizId = quizIdsCourse2.get(i);
+                score1.score = 60 + (Math.random() * 40); // Random score between 60 and 100
+                quizDao.insertStudentQuizCrossRef(score1);
+
+                // Student 2134
+                StudentQuizCrossRef score2 = new StudentQuizCrossRef();
+                score2.studentId = student2Id;
+                score2.quizId = quizIdsCourse2.get(i);
+                score2.score = 60 + (Math.random() * 40);
+                quizDao.insertStudentQuizCrossRef(score2);
+
+                // Student 1852
+                StudentQuizCrossRef score3 = new StudentQuizCrossRef();
+                score3.studentId = student3Id;
+                score3.quizId = quizIdsCourse2.get(i);
+                score3.score = 60 + (Math.random() * 40);
+                quizDao.insertStudentQuizCrossRef(score3);
+            }
+
+            // Insert random scores for DPSD
+            for (int i = 0; i < 5; i++) {
+                // Student 1234
+                StudentQuizCrossRef score1 = new StudentQuizCrossRef();
+                score1.studentId = student1Id;
+                score1.quizId = quizIdsCourse3.get(i);
+                score1.score = 60 + (Math.random() * 40);
+                quizDao.insertStudentQuizCrossRef(score1);
+
+                // Student 2134
+                StudentQuizCrossRef score2 = new StudentQuizCrossRef();
+                score2.studentId = student2Id;
+                score2.quizId = quizIdsCourse3.get(i);
+                score2.score = 60 + (Math.random() * 40);
+                quizDao.insertStudentQuizCrossRef(score2);
+
+                // Student 1852
+                StudentQuizCrossRef score3 = new StudentQuizCrossRef();
+                score3.studentId = student3Id;
+                score3.quizId = quizIdsCourse3.get(i);
+                score3.score = 60 + (Math.random() * 40);
+                quizDao.insertStudentQuizCrossRef(score3);
+            }
+        } catch (Exception e) {
+            Log.e("AppDatabase", "Error seeding database: " + e.getMessage());
         }
     }
 }

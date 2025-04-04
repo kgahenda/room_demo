@@ -4,15 +4,11 @@ import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
 @Entity
-public class Quiz
-{
+public class Quiz {
     @PrimaryKey(autoGenerate = true)
     private Long quizId;
     private Long courseId;
     private String name;
-    private int highScore;
-    private int lowScore;
-    private double averageScore;
 
     public Long getQuizId() {
         return quizId;
@@ -22,14 +18,12 @@ public class Quiz
         this.quizId = quizId;
     }
 
-    public Long getCourseId()
-    {
+    public Long getCourseId() {
         return courseId;
     }
 
-    public void setCourseId(Long cId)
-    {
-        courseId = cId;
+    public void setCourseId(Long cId) {
+        this.courseId = cId;
     }
 
     public String getName() {
@@ -38,29 +32,5 @@ public class Quiz
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public int getHighScore() {
-        return highScore;
-    }
-
-    public void setHighScore(int highScore) {
-        this.highScore = highScore;
-    }
-
-    public int getLowScore() {
-        return lowScore;
-    }
-
-    public void setLowScore(int lowScore) {
-        this.lowScore = lowScore;
-    }
-
-    public double getAverageScore() {
-        return averageScore;
-    }
-
-    public void setAverageScore(double averageScore) {
-        this.averageScore = averageScore;
     }
 }

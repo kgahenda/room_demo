@@ -14,8 +14,7 @@ import com.cmu.roomproject3.model.relations.QuizWithStudents;
 import java.util.List;
 
 @Dao
-public interface QuizDao
-{
+public interface QuizDao {
     @Insert
     Long insert(Quiz quiz);
 
@@ -29,8 +28,9 @@ public interface QuizDao
     @Query("SELECT * FROM Quiz WHERE quizId = :quizId")
     LiveData<QuizWithStudents> getQuizWithStudents(Long quizId);
 
+    // Change to return LiveData for asynchronous access
     @Query("SELECT * FROM StudentQuizCrossRef WHERE quizId = :quizId")
-    List<StudentQuizCrossRef> getScoresForQuiz(Long quizId);
+    LiveData<List<StudentQuizCrossRef>> getScoresForQuiz(Long quizId);
 
     @Insert
     void insertStudentQuizCrossRef(StudentQuizCrossRef crossRef);
