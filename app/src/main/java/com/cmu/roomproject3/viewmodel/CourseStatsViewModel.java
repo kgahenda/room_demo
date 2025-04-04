@@ -52,7 +52,6 @@ public class CourseStatsViewModel extends AndroidViewModel {
                     Log.d(TAG, "Quiz ID: " + quiz.getQuizId() + ", Name: " + quiz.getName() + ", Course ID: " + quiz.getCourseId());
                 }
 
-                // Define a final list to hold students
                 final List<Student> studentList = new ArrayList<>();
 
                 db.studentDao().getStudentsByCourse(courseId).observe(lifecycleOwner, students -> {
@@ -73,31 +72,26 @@ public class CourseStatsViewModel extends AndroidViewModel {
 
                     List<String> stats = new ArrayList<>();
                     stats.add("Course Title: " + courseName);
-                    stats.add("");
-                    stats.add(String.format("%-12s", "Student"));
-                    for (int i = 1; i <= maxQuizNumber; i++) {
-                        stats.set(stats.size() - 1, stats.get(stats.size() - 1) + String.format("%-11s", "Q" + i));
-                    }
+                    stats.add(""); // Empty row
+                    stats.add("Student " + String.join(" ", getQuizHeaders(maxQuizNumber)));
 
                     Map<Integer, List<Double>> quizScoresMap = new HashMap<>();
                     for (int i = 1; i <= maxQuizNumber; i++) {
                         quizScoresMap.put(i, new ArrayList<>());
                     }
 
-                    // Map to store scores for each quiz
                     Map<Long, List<StudentQuizCrossRef>> allScores = new HashMap<>();
                     List<Long> quizIds = new ArrayList<>();
                     for (Quiz quiz : courseWithQuizzes.quizzes) {
                         quizIds.add(quiz.getQuizId());
                     }
 
-                    // Counter to track when all scores are loaded
                     final int[] quizzesProcessed = {0};
                     final int totalQuizzes = quizIds.size();
 
                     for (int i = 0; i < totalQuizzes; i++) {
                         Long quizId = quizIds.get(i);
-                        final int quizIndex = i + 1; // For quizScoresMap (1-based index)
+                        final int quizIndex = i + 1;
 
                         db.quizDao().getScoresForQuiz(quizId).observe(lifecycleOwner, scores -> {
                             allScores.put(quizId, scores != null ? scores : new ArrayList<>());
@@ -110,14 +104,14 @@ public class CourseStatsViewModel extends AndroidViewModel {
 
                             quizzesProcessed[0]++;
                             if (quizzesProcessed[0] == totalQuizzes) {
-                                // All scores are loaded, build the table
-                                for (Student student : studentList) { // Use studentList here
+                                for (Student student : studentList) {
                                     if (student.getStudentId() == null) {
                                         Log.e(TAG, "Student ID is null for student: " + student.getName());
                                         continue;
                                     }
 
-                                    StringBuilder line = new StringBuilder(String.format("%-12d", student.getStudentId()));
+                                    List<String> row = new ArrayList<>();
+                                    row.add(String.valueOf(student.getStudentId()));
                                     for (int j = 0; j < maxQuizNumber; j++) {
                                         Long qId = quizIds.get(j);
                                         List<StudentQuizCrossRef> scoresForQuiz = allScores.get(qId);
@@ -126,28 +120,16 @@ public class CourseStatsViewModel extends AndroidViewModel {
                                                 .findFirst()
                                                 .orElse(null);
                                         double scoreValue = (score != null) ? score.score : 0.0;
-                                        line.append(String.format("%-11.0f", scoreValue));
+                                        row.add(String.format("%.0f", scoreValue));
                                         quizScoresMap.get(j + 1).add(scoreValue);
                                     }
-                                    stats.add(line.toString());
+                                    stats.add(String.join(" ", row));
                                 }
 
-                                // Add statistics
-                                stats.add("");
-                                stats.add(String.format("%-12s", "High Score"));
-                                stats.add(String.format("%-12s", "Low Score"));
-                                stats.add(String.format("%-12s", "Average"));
-                                for (int j = 1; j <= maxQuizNumber; j++) {
-                                    List<Double> scoresForQuiz = quizScoresMap.get(j);
-                                    if (!scoresForQuiz.isEmpty()) {
-                                        double high = scoresForQuiz.stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
-                                        double low = scoresForQuiz.stream().mapToDouble(Double::doubleValue).min().orElse(0.0);
-                                        double avg = scoresForQuiz.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
-                                        stats.set(stats.size() - 3, stats.get(stats.size() - 3) + String.format("%-11.0f", high));
-                                        stats.set(stats.size() - 2, stats.get(stats.size() - 2) + String.format("%-11.0f", low));
-                                        stats.set(stats.size() - 1, stats.get(stats.size() - 1) + String.format("%-11.1f", avg));
-                                    }
-                                }
+                                stats.add(""); // Empty row
+                                stats.add("High " + getStatsRow(quizScoresMap, maxQuizNumber, "max"));
+                                stats.add("Low " + getStatsRow(quizScoresMap, maxQuizNumber, "min"));
+                                stats.add("Avg " + getStatsRow(quizScoresMap, maxQuizNumber, "avg"));
                                 courseStats.setValue(stats);
                             }
                         });
@@ -158,5 +140,42 @@ public class CourseStatsViewModel extends AndroidViewModel {
             Log.e(TAG, "Error loading stats: " + e.getMessage());
             courseStats.setValue(new ArrayList<>());
         }
+    }
+
+    private String getQuizHeaders(int maxQuizNumber) {
+        List<String> headers = new ArrayList<>();
+        for (int i = 1; i <= maxQuizNumber; i++) {
+            headers.add("Q" + i);
+        }
+        return String.join(" ", headers);
+    }
+
+    private String getStatsRow(Map<Integer, List<Double>> quizScoresMap, int maxQuizNumber, String type) {
+        List<String> values = new ArrayList<>();
+        for (int i = 1; i <= maxQuizNumber; i++) {
+            List<Double> scores = quizScoresMap.get(i);
+            if (scores.isEmpty()) {
+                values.add("0");
+                continue;
+            }
+            double value;
+            switch (type) {
+                case "max":
+                    value = scores.stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
+                    values.add(String.format("%.0f", value));
+                    break;
+                case "min":
+                    value = scores.stream().mapToDouble(Double::doubleValue).min().orElse(0.0);
+                    values.add(String.format("%.0f", value));
+                    break;
+                case "avg":
+                    value = scores.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+                    values.add(String.format("%.1f", value));
+                    break;
+                default:
+                    values.add("0");
+            }
+        }
+        return String.join(" ", values);
     }
 }
